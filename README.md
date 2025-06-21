@@ -51,8 +51,8 @@ https://github.com/user-attachments/assets/722e1885-5aeb-4584-8116-b93324e0abc1
 ### 1. Clone and Build
 
 ```bash
-git clone https://github.com/itz4blitz/jmx-mcp-server.git
-cd jmx-mcp-server
+git clone https://github.com/itz4blitz/JMX-MCP.git
+cd JMX-MCP
 mvn clean package
 ```
 
@@ -321,8 +321,8 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 
 ```bash
 # Fork the repository on GitHub
-git clone https://github.com/YOUR_USERNAME/jmx-mcp-server.git
-cd jmx-mcp-server
+git clone https://github.com/YOUR_USERNAME/JMX-MCP.git
+cd JMX-MCP
 
 # Build and test
 mvn clean compile
@@ -361,9 +361,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **Issues**: [GitHub Issues](https://github.com/itz4blitz/jmx-mcp-server/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/itz4blitz/jmx-mcp-server/discussions)
-- **Documentation**: [Wiki](https://github.com/itz4blitz/jmx-mcp-server/wiki)
+- **Issues**: [GitHub Issues](https://github.com/itz4blitz/JMX-MCP/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/itz4blitz/JMX-MCP/discussions)
+- **Documentation**: [Wiki](https://github.com/itz4blitz/JMX-MCP/wiki)
 
 ---
 
