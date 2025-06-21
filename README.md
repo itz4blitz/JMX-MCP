@@ -35,7 +35,7 @@ https://github.com/user-attachments/assets/722e1885-5aeb-4584-8116-b93324e0abc1
 - **Production Logging**: Configurable logging for different environments
 
 ### 🔌 **MCP Protocol Compliance**
-- **Tools**: 6 JMX management tools for AI interaction
+- **Tools**: 12 JMX management tools for AI interaction
 - **Resources**: All JMX attributes exposed as discoverable resources
 - **STDIO Transport**: Optimized for Claude Desktop integration
 - **JSON-RPC 2.0**: Full protocol compliance for reliable communication
@@ -106,8 +106,9 @@ Restart Claude Desktop and try these queries:
 "What's the garbage collection performance?"
 ```
 
-## 🔧 Available Tools
+## 🔧 Available Tools (12 Total)
 
+### Core JMX Operations
 | Tool | Description | Example Usage |
 |------|-------------|---------------|
 | `listMBeans` | List all discovered MBeans with optional domain filtering | "Show me all memory-related MBeans" |
@@ -115,7 +116,21 @@ Restart Claude Desktop and try these queries:
 | `getAttribute` | Read the value of an MBean attribute | "What's the current heap memory usage?" |
 | `setAttribute` | Set the value of a writable MBean attribute | "Set the log level to DEBUG" |
 | `listDomains` | List all available MBean domains | "What domains are available?" |
-| `getConnectionInfo` | Get JMX connection status and statistics | "Is the JMX connection healthy?" |
+
+### Connection Management
+| Tool | Description | Example Usage |
+|------|-------------|---------------|
+| `listJmxConnections` | List all configured JMX connections | "Show me all available connections" |
+| `addJmxConnection` | Add a new JMX connection | "Connect to the production server" |
+| `removeJmxConnection` | Remove a JMX connection | "Remove the old test connection" |
+| `switchJmxConnection` | Switch to a different JMX connection | "Switch to the staging environment" |
+| `getConnectionInfo` | Get current JMX connection status and statistics | "Is the JMX connection healthy?" |
+
+### Service Discovery
+| Tool | Description | Example Usage |
+|------|-------------|---------------|
+| `discoverJmxServices` | Discover JMX-enabled Java applications on the system | "Find all Java apps with JMX enabled" |
+| `autoRegisterDiscoveredConnections` | Automatically register discovered JMX services | "Auto-connect to all discovered Java apps" |
 
 ## 📊 Available Resources
 
@@ -180,9 +195,10 @@ Recommendation: Monitor thread creation patterns.
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Claude AI     │◄──►│  JMX MCP Server  │◄──►│  Java App JMX   │
 │                 │    │                  │    │                 │
-│ Natural Language│    │ • Tools (6)      │    │ • MBeans        │
+│ Natural Language│    │ • Tools (12)     │    │ • MBeans        │
 │ Queries         │    │ • Resources(224+)│    │ • Attributes    │
 │                 │    │ • JSON-RPC 2.0   │    │ • Operations    │
+│                 │    │ • Multi-Connect  │    │ • Discovery     │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
 ```
 
@@ -216,7 +232,9 @@ python3 comprehensive-test.py
 **Test Coverage:**
 - ✅ MCP Protocol compliance
 - ✅ JSON-RPC 2.0 communication
-- ✅ Tool registration and execution
+- ✅ All 12 tools registration and execution
+- ✅ Multi-connection management
+- ✅ Service discovery and auto-registration
 - ✅ Resource discovery and access
 - ✅ Error handling and recovery
 
