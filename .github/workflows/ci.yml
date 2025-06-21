@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -33,12 +38,13 @@ jobs:
       run: mvn clean test
       
     - name: Generate test report
-      uses: dorny/test-reporter@v1
+      uses: dorny/test-reporter@v1.9.1
       if: success() || failure()
       with:
         name: Maven Tests (Java ${{ matrix.java-version }})
         path: target/surefire-reports/*.xml
         reporter: java-junit
+        fail-on-error: false
         
     - name: Upload coverage reports to Codecov
       if: matrix.java-version == '17'
