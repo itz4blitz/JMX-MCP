@@ -11,10 +11,7 @@ A powerful **Model Context Protocol (MCP) server** that provides comprehensive J
 
 Watch the JMX MCP Server in action! See how Claude Desktop can monitor and manage Java applications through natural language:
 
-<video width="50%" controls controlsList="" allowfullscreen>
-  <source src="./JMX-MCP.mp4" type="video/mp4">
-  Your browser does not support the video tag. <a href="./JMX-MCP.mp4">Download the demo video</a>
-</video>
+![JMX MCP Server Demo](./JMX-MCP.mp4)
 
 *The demo shows real-time JMX monitoring, MBean exploration, and AI-powered Java application management through Claude Desktop.*
 
