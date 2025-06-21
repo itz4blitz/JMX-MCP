@@ -1,0 +1,27 @@
+# STDIO-specific configuration for Claude Desktop integration
+spring:
+  main:
+    banner-mode: "off"
+    web-application-type: none  # Disable web server completely
+    log-startup-info: false  # Disable startup info logging
+  ai:
+    mcp:
+      server:
+        enabled: true
+        stdio: true
+        name: "JMX MCP Server"
+        version: "1.0.0"
+        type: SYNC
+        instructions: "This server provides JMX monitoring and management capabilities through MCP. It exposes JMX operations as tools and JMX attributes as resources, allowing AI models to monitor and manage Java applications."
+        capabilities:
+          tool: true
+          resource: true
+          prompt: false
+          completion: false
+        resource-change-notification: false  # Disable for STDIO
+        tool-change-notification: false     # Disable for STDIO
+
+# Minimal logging for STDIO mode
+logging:
+  level:
+    root: ERROR

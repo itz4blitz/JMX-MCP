@@ -1,0 +1,104 @@
+# JMX MCP Server configuration with multiple connections
+spring:
+  application:
+    name: jmx-mcp-server
+  main:
+    banner-mode: "off"  # Disable Spring Boot banner for STDIO mode
+  
+  # Spring AI MCP Server Configuration
+  ai:
+    mcp:
+      server:
+        enabled: true
+        stdio: true  # Enable STDIO transport for Claude Desktop
+        name: "JMX MCP Server (Multi-Connection)"
+        version: "1.0.0"
+        type: SYNC
+        instructions: "This server provides JMX monitoring and management capabilities through MCP with support for multiple JMX connections. It can auto-discover and connect to multiple JMX-enabled applications."
+
+        capabilities:
+          tool: true
+          resource: true
+          prompt: false
+          completion: false
+        resource-change-notification: true
+        tool-change-notification: true
+
+# JMX MCP Server specific configuration
+jmx:
+  mcp:
+    # Default/Legacy single connection (for backward compatibility)
+    connection:
+      type: LOCAL  # LOCAL or REMOTE
+      # url: "service:jmx:rmi:///jndi/rmi://localhost:9999/jmxrmi"  # For remote connections
+      # username: "admin"  # Optional for remote connections
+      # password: "password"  # Optional for remote connections
+      timeout: 30s
+      
+    # Multiple connection configurations (new feature)
+    connections:
+      - id: "local-jvm"
+        name: "Local JVM (MCP Server)"
+        type: LOCAL
+        defaultConnection: true
+        
+      - id: "my-app"
+        name: "My Application"
+        type: REMOTE
+        url: "service:jmx:rmi:///jndi/rmi://localhost:9999/jmxrmi"
+        username: "admin"
+        password: "password"
+        defaultConnection: false
+        
+      - id: "another-app"
+        name: "Another Application"
+        type: REMOTE
+        url: "service:jmx:rmi:///jndi/rmi://localhost:9010/jmxrmi"
+        defaultConnection: false
+        
+    # JMX Service Discovery Configuration
+    serviceDiscovery:
+      enabled: true
+      autoRegister: true
+      scanPorts: [9999, 9010, 8999, 7199, 1099, 8080, 8081]
+      excludeProcesses: ["jmx-mcp-server", "idea", "eclipse"]
+      
+    # MBean Discovery settings
+    discovery:
+      includePatterns:
+        - "*:*"  # Include all MBeans by default
+      excludePatterns:
+        - "java.util.logging:*"  # Exclude logging MBeans
+        - "com.sun.management:*"  # Exclude internal Sun management MBeans
+      refreshInterval: 30s
+      discoverOnStartup: true
+      
+    # MCP Tools configuration
+    tools:
+      enabled: true
+      prefix: "jmx"
+      maxParameters: 10
+      excludeOperations: []
+      
+    # MCP Resources configuration
+    resources:
+      enabled: true
+      baseUri: "jmx://"
+      includeReadOnly: true
+      includeWriteOnly: false
+      excludeAttributes: []
+      
+    # Security configuration
+    security:
+      validateParameters: true
+      dangerousOperations: ["shutdown", "restart", "stop", "destroy", "halt"]
+      logOperations: true
+
+# Logging configuration for multi-connection mode
+logging:
+  level:
+    org.jmxmcp: INFO
+    org.jmxmcp.service.JmxDiscoveryService: DEBUG
+    org.jmxmcp.jmx.JmxConnectionRegistry: DEBUG
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

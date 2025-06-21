@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # JMX MCP Server
+  jmx-mcp-server:
+    build: .
+    container_name: jmx-mcp-server
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    volumes:
+      - ./config:/app/config:ro
+      - ./logs:/app/logs
+    networks:
+      - jmx-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Sample Java application with JMX enabled
+  sample-app:
+    image: eclipse-temurin:21-jre-alpine
+    container_name: sample-java-app
+    ports:
+      - "9999:9999"  # JMX port
+      - "8081:8081"  # Application port
+    environment:
+      - JAVA_OPTS=-Dcom.sun.management.jmxremote
+                   -Dcom.sun.management.jmxremote.port=9999
+                   -Dcom.sun.management.jmxremote.rmi.port=9999
+                   -Dcom.sun.management.jmxremote.authenticate=false
+                   -Dcom.sun.management.jmxremote.ssl=false
+                   -Djava.rmi.server.hostname=sample-app
+    command: >
+      sh -c "
+        echo 'Starting sample Java application with JMX...' &&
+        java $$JAVA_OPTS -cp /app -Dserver.port=8081 SampleApp
+      "
+    volumes:
+      - ./examples/SampleApp.java:/app/SampleApp.java:ro
+    networks:
+      - jmx-network
+    restart: unless-stopped
+
+  # PostgreSQL database (example for database monitoring)
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres-db
+    environment:
+      - POSTGRES_DB=testdb
+      - POSTGRES_USER=testuser
+      - POSTGRES_PASSWORD=testpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - jmx-network
+    restart: unless-stopped
+
+  # Spring Boot application with JMX (example target)
+  spring-app:
+    image: openjdk:21-jre-slim
+    container_name: spring-boot-app
+    ports:
+      - "8082:8080"
+      - "9998:9998"  # JMX port
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,info,metrics,beans
+      - JAVA_OPTS=-Dcom.sun.management.jmxremote
+                   -Dcom.sun.management.jmxremote.port=9998
+                   -Dcom.sun.management.jmxremote.rmi.port=9998
+                   -Dcom.sun.management.jmxremote.authenticate=false
+                   -Dcom.sun.management.jmxremote.ssl=false
+                   -Djava.rmi.server.hostname=spring-app
+    volumes:
+      - ./examples/spring-boot-app.jar:/app/app.jar:ro
+    command: java $JAVA_OPTS -jar /app/app.jar
+    networks:
+      - jmx-network
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+networks:
+  jmx-network:
+    driver: bridge
+
+volumes:
+  postgres_data:

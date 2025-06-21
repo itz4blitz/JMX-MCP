@@ -1,0 +1,93 @@
+# JMX MCP Server Configuration
+spring:
+  application:
+    name: jmx-mcp-server
+  main:
+    banner-mode: "off"  # Disable Spring Boot banner for STDIO mode
+
+  # Disable JMX on the MCP server itself - it should be a pure client
+  jmx:
+    enabled: false
+  
+  # Spring AI MCP Server Configuration
+  ai:
+    mcp:
+      server:
+        enabled: true
+        stdio: true  # Enable STDIO transport for Claude Desktop
+        name: "JMX MCP Server"
+        version: "1.0.0"
+        type: SYNC
+        instructions: "This server provides JMX monitoring and management capabilities through MCP. It exposes JMX operations as tools and JMX attributes as resources, allowing AI models to monitor and manage Java applications."
+
+        capabilities:
+          tool: true
+          resource: true
+          prompt: false
+          completion: false
+        resource-change-notification: true
+        tool-change-notification: true
+
+# JMX MCP Server specific configuration
+jmx:
+  mcp:
+    # JMX Connection settings
+    connection:
+      type: LOCAL  # LOCAL or REMOTE
+      # url: "service:jmx:rmi:///jndi/rmi://localhost:9999/jmxrmi"  # For remote connections
+      # username: "admin"  # Optional for remote connections
+      # password: "password"  # Optional for remote connections
+      timeout: 30s
+      
+    # MBean Discovery settings
+    discovery:
+      include-patterns:
+        - "*:*"  # Include all MBeans by default
+      exclude-patterns:
+        - "java.util.logging:*"  # Exclude logging MBeans
+        - "com.sun.management:*"  # Exclude internal Sun management MBeans
+      refresh-interval: 30s
+      discover-on-startup: true
+      
+    # MCP Tools configuration (JMX Operations)
+    tools:
+      enabled: true
+      prefix: "jmx"
+      max-parameters: 10
+      exclude-operations:
+        - "addNotificationListener"
+        - "removeNotificationListener"
+        
+    # MCP Resources configuration (JMX Attributes)
+    resources:
+      enabled: true
+      base-uri: "jmx://"
+      include-read-only: true
+      include-write-only: false
+      exclude-attributes:
+        - "ObjectName"
+        
+    # Security settings
+    security:
+      validate-parameters: true
+      dangerous-operations:
+        - "shutdown"
+        - "restart"
+        - "stop"
+        - "destroy"
+        - "gc"
+      log-operations: true
+
+# Note: Actuator endpoints not available in STDIO mode
+
+# Logging configuration for STDIO mode
+logging:
+  level:
+    org.jmxmcp: DEBUG  # Enable debug logging for testing
+    org.springframework.ai.mcp: WARN
+    org.springframework.boot: WARN
+    org.springframework: WARN
+    root: WARN
+  pattern:
+    console: "%msg%n"  # Minimal console output for STDIO
+  file: "jmx-mcp-server.log"  # Log to file instead of console

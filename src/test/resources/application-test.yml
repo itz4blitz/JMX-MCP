@@ -1,0 +1,74 @@
+# Test configuration for JMX MCP Server
+spring:
+  application:
+    name: jmx-mcp-server-test
+  
+  # Spring AI MCP Server Configuration for testing
+  ai:
+    mcp:
+      server:
+        enabled: true
+        name: "Test JMX MCP Server"
+        version: "1.0.0-TEST"
+        type: SYNC
+        instructions: "Test server for JMX MCP integration testing"
+        capabilities:
+          tool: true
+          resource: true
+          prompt: false
+          completion: false
+
+# JMX MCP Server test configuration
+jmx:
+  mcp:
+    # Local JMX Connection for testing
+    connection:
+      type: LOCAL
+      timeout: 10s
+      
+    # Limited discovery for testing
+    discovery:
+      include-patterns:
+        - "java.lang:type=Memory"
+        - "java.lang:type=Runtime"
+        - "java.lang:type=Threading"
+      exclude-patterns:
+        - "java.util.logging:*"
+        - "com.sun.management:*"
+      refresh-interval: 60s
+      discover-on-startup: true
+      
+    # Limited tools for testing
+    tools:
+      enabled: true
+      prefix: "test-jmx"
+      max-parameters: 5
+      exclude-operations:
+        - "addNotificationListener"
+        - "removeNotificationListener"
+        
+    # Limited resources for testing
+    resources:
+      enabled: true
+      base-uri: "test-jmx://"
+      include-read-only: true
+      include-write-only: false
+      exclude-attributes:
+        - "ObjectName"
+        
+    # Security settings for testing
+    security:
+      validate-parameters: true
+      dangerous-operations:
+        - "shutdown"
+        - "gc"
+      log-operations: false  # Reduce noise in tests
+
+# Logging configuration for tests
+logging:
+  level:
+    org.jmxmcp: DEBUG
+    org.springframework.ai.mcp: WARN
+    javax.management: WARN
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"

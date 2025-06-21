@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        
+    - name: Cache Maven packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.m2
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-m2
+        
+    - name: Build with Maven
+      run: mvn clean package -DskipTests
+      
+    - name: Get version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ steps.get_version.outputs.VERSION }}
+        body: |
+          ## Changes in this Release
+          
+          ### Features
+          - JMX MCP Server v${{ steps.get_version.outputs.VERSION }}
+          - Full MCP protocol support
+          - Comprehensive JMX monitoring capabilities
+          - AI-powered Java application management
+          
+          ### Installation
+          
+          1. Download the JAR file below
+          2. Configure in Claude Desktop (see README.md)
+          3. Start monitoring your Java applications!
+          
+          ### Requirements
+          - Java 17 or higher
+          - Claude Desktop with MCP support
+          
+          See the [README.md](https://github.com/itz4blitz/jmx-mcp-server/blob/main/README.md) for detailed setup instructions.
+        draft: false
+        prerelease: false
+        
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: target/jmx-mcp-server-${{ steps.get_version.outputs.VERSION }}.jar
+        asset_name: jmx-mcp-server-${{ steps.get_version.outputs.VERSION }}.jar
+        asset_content_type: application/java-archive

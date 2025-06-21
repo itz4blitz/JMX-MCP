@@ -1,0 +1,95 @@
+# Docker configuration for JMX MCP Server
+spring:
+  application:
+    name: jmx-mcp-server-docker
+  
+  # Spring AI MCP Server Configuration for Docker
+  ai:
+    mcp:
+      server:
+        enabled: true
+        name: "Docker JMX MCP Server"
+        version: "1.0.0"
+        type: SYNC
+        instructions: "JMX MCP Server running in Docker, capable of monitoring containerized Java applications"
+        sse-message-endpoint: /mcp/messages
+        capabilities:
+          tool: true
+          resource: true
+          prompt: false
+          completion: false
+
+# JMX MCP Server Docker configuration
+jmx:
+  mcp:
+    # Remote JMX Connection to other containers
+    connection:
+      type: REMOTE
+      url: "service:jmx:rmi:///jndi/rmi://sample-app:9999/jmxrmi"
+      timeout: 45s
+      
+    # Discovery settings for containerized apps
+    discovery:
+      include-patterns:
+        - "java.lang:*"
+        - "org.springframework.boot:*"
+        - "com.zaxxer.hikari:*"
+        - "org.apache.catalina:*"
+      exclude-patterns:
+        - "java.util.logging:*"
+        - "com.sun.management:*"
+        - "*:type=RequestProcessor,*"
+      refresh-interval: 60s
+      discover-on-startup: true
+      
+    # Tools configuration for Docker
+    tools:
+      enabled: true
+      prefix: "docker-jmx"
+      max-parameters: 10
+      exclude-operations:
+        - "addNotificationListener"
+        - "removeNotificationListener"
+        
+    # Resources configuration for Docker
+    resources:
+      enabled: true
+      base-uri: "docker-jmx://"
+      include-read-only: true
+      include-write-only: false
+      exclude-attributes:
+        - "ObjectName"
+        
+    # Security settings for Docker
+    security:
+      validate-parameters: true
+      dangerous-operations:
+        - "shutdown"
+        - "restart"
+        - "stop"
+        - "destroy"
+        - "gc"
+      log-operations: true
+
+# Actuator configuration for Docker
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env
+  endpoint:
+    health:
+      show-details: always
+  server:
+    port: 8080
+
+# Logging configuration for Docker
+logging:
+  level:
+    org.jmxmcp: INFO
+    org.springframework.ai.mcp: INFO
+    javax.management.remote: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: /app/logs/jmx-mcp-server.log

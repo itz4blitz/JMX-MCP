@@ -1,0 +1,241 @@
+# JMX MCP Server Configuration Examples
+# Copy and modify these examples for your specific use case
+
+# Example 1: Local JVM Monitoring (Default)
+---
+spring:
+  profiles: local-monitoring
+  ai:
+    mcp:
+      server:
+        name: "Local JVM Monitor"
+        instructions: "Monitor local JVM metrics and perform basic management operations"
+
+jmx:
+  mcp:
+    connection:
+      type: LOCAL
+    discovery:
+      include-patterns:
+        - "java.lang:type=Memory"
+        - "java.lang:type=Runtime"
+        - "java.lang:type=Threading"
+        - "java.lang:type=GarbageCollector,*"
+        - "java.lang:type=MemoryPool,*"
+    tools:
+      enabled: true
+      exclude-operations:
+        - "addNotificationListener"
+        - "removeNotificationListener"
+    resources:
+      enabled: true
+      include-read-only: true
+      include-write-only: false
+
+---
+# Example 2: Remote Application Server Monitoring
+spring:
+  profiles: remote-appserver
+  ai:
+    mcp:
+      server:
+        name: "Remote Application Server Monitor"
+        instructions: "Monitor remote Tomcat/Spring Boot application with enhanced security"
+
+jmx:
+  mcp:
+    connection:
+      type: REMOTE
+      url: "service:jmx:rmi:///jndi/rmi://app-server:9999/jmxrmi"
+      username: "monitoring"
+      password: "${JMX_PASSWORD}"
+      timeout: 45s
+    discovery:
+      include-patterns:
+        - "java.lang:*"
+        - "org.apache.catalina:*"
+        - "org.springframework.boot:*"
+        - "com.zaxxer.hikari:*"  # HikariCP connection pool
+      exclude-patterns:
+        - "*:type=RequestProcessor,*"  # Exclude noisy request processors
+        - "java.util.logging:*"
+      refresh-interval: 120s
+    tools:
+      enabled: true
+      prefix: "remote-app"
+      max-parameters: 5
+      exclude-operations:
+        - "dumpAllThreads"  # Potentially expensive
+    resources:
+      enabled: true
+      base-uri: "remote-app://"
+      include-read-only: true
+      include-write-only: false
+    security:
+      dangerous-operations:
+        - "shutdown"
+        - "restart"
+        - "gc"
+        - "dumpHeap"
+
+---
+# Example 3: Database Monitoring (PostgreSQL with JMX)
+spring:
+  profiles: database-monitoring
+  ai:
+    mcp:
+      server:
+        name: "Database Performance Monitor"
+        instructions: "Monitor database connection pools and performance metrics"
+
+jmx:
+  mcp:
+    connection:
+      type: REMOTE
+      url: "service:jmx:rmi:///jndi/rmi://db-server:9999/jmxrmi"
+    discovery:
+      include-patterns:
+        - "com.zaxxer.hikari:*"      # HikariCP
+        - "org.postgresql:*"         # PostgreSQL driver
+        - "com.mchange.v2.c3p0:*"    # C3P0 connection pool
+        - "org.apache.commons.dbcp2:*" # Apache DBCP2
+        - "java.lang:type=Memory"
+        - "java.lang:type=Threading"
+      refresh-interval: 60s
+    tools:
+      enabled: true
+      prefix: "db"
+      exclude-operations:
+        - "close"  # Don't allow closing connections via AI
+    resources:
+      enabled: true
+      base-uri: "db://"
+
+---
+# Example 4: Microservices Monitoring
+spring:
+  profiles: microservices
+  ai:
+    mcp:
+      server:
+        name: "Microservices Fleet Monitor"
+        instructions: "Monitor multiple microservices with Spring Boot Actuator metrics"
+
+jmx:
+  mcp:
+    connection:
+      type: REMOTE
+      url: "service:jmx:rmi:///jndi/rmi://service-discovery:9999/jmxrmi"
+    discovery:
+      include-patterns:
+        - "org.springframework.boot:*"
+        - "io.micrometer:*"
+        - "com.netflix.eureka:*"     # Eureka client
+        - "com.netflix.ribbon:*"     # Ribbon load balancer
+        - "hystrix:*"                # Hystrix circuit breaker
+        - "java.lang:type=Memory"
+        - "java.lang:type=Threading"
+      exclude-patterns:
+        - "*:type=Endpoint,*"        # Exclude endpoint metrics
+      refresh-interval: 30s
+    tools:
+      enabled: true
+      prefix: "microservice"
+      max-parameters: 3
+    resources:
+      enabled: true
+      base-uri: "microservice://"
+
+---
+# Example 5: Development/Debug Mode
+spring:
+  profiles: development
+  ai:
+    mcp:
+      server:
+        name: "Development Debug Monitor"
+        instructions: "Full access development monitoring with detailed logging"
+
+jmx:
+  mcp:
+    connection:
+      type: LOCAL
+    discovery:
+      include-patterns:
+        - "*:*"  # Include everything for development
+      exclude-patterns: []  # Don't exclude anything
+      refresh-interval: 15s
+    tools:
+      enabled: true
+      prefix: "dev"
+      max-parameters: 20  # Allow complex operations
+      exclude-operations: []  # Allow all operations
+    resources:
+      enabled: true
+      base-uri: "dev://"
+      include-read-only: true
+      include-write-only: true  # Allow write operations in dev
+      exclude-attributes: []
+    security:
+      validate-parameters: false  # Relaxed validation for dev
+      log-operations: true
+      dangerous-operations: []  # Don't restrict operations in dev
+
+logging:
+  level:
+    org.jmxmcp: DEBUG
+    javax.management: DEBUG
+
+---
+# Example 6: Production Monitoring (Secure)
+spring:
+  profiles: production
+  ai:
+    mcp:
+      server:
+        name: "Production Monitor (Read-Only)"
+        instructions: "Secure production monitoring with read-only access and strict validation"
+
+jmx:
+  mcp:
+    connection:
+      type: REMOTE
+      url: "service:jmx:rmi:///jndi/rmi://prod-server:9999/jmxrmi"
+      username: "${PROD_JMX_USER}"
+      password: "${PROD_JMX_PASSWORD}"
+      timeout: 30s
+      properties:
+        "javax.net.ssl.trustStore": "/etc/ssl/jmx-truststore.jks"
+        "javax.net.ssl.trustStorePassword": "${TRUSTSTORE_PASSWORD}"
+    discovery:
+      include-patterns:
+        - "java.lang:type=Memory"
+        - "java.lang:type=Runtime"
+        - "java.lang:type=Threading"
+        - "java.lang:type=GarbageCollector,*"
+        - "com.mycompany.app:*"  # Application-specific MBeans only
+      exclude-patterns:
+        - "java.util.logging:*"
+        - "com.sun.management:*"
+        - "*:type=RequestProcessor,*"
+      refresh-interval: 300s  # 5 minutes for production
+    tools:
+      enabled: false  # No operations in production
+    resources:
+      enabled: true
+      base-uri: "prod://"
+      include-read-only: true
+      include-write-only: false  # Read-only in production
+      exclude-attributes:
+        - "ObjectName"
+        - "Verbose"
+    security:
+      validate-parameters: true
+      log-operations: true
+      dangerous-operations:
+        - "*"  # All operations are dangerous in production
+
+logging:
+  level:
+    org.jmxmcp: INFO
+    javax.management.remote: WARN
