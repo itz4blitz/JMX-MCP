@@ -80,37 +80,44 @@ public class MBeanDiscoveryService {
         try {
             MBeanServerConnection connection = connectionManager.getConnection();
             Set<ObjectName> objectNames = connection.queryNames(null, null);
-            
+
+            // Fetch all MBean info into a local map first: each getMBeanInfo is a
+            // remote round trip, and doing this under the write lock would block
+            // every cache reader (listMBeans, getMBean, ...) for the whole scan.
+            Map<ObjectName, MBeanInfo> discovered = new HashMap<>();
+            for (ObjectName objectName : objectNames) {
+                if (shouldIncludeMBean(objectName)) {
+                    loadMBeanInfo(connection, objectName, discovered);
+                }
+            }
+
+            // Swap the new data in under a short-lived write lock.
             cacheLock.writeLock().lock();
             try {
                 mbeanCache.clear();
-                
-                for (ObjectName objectName : objectNames) {
-                    if (shouldIncludeMBean(objectName)) {
-                        loadMBeanInfo(connection, objectName);
-                    }
-                }
+                mbeanCache.putAll(discovered);
             } finally {
                 cacheLock.writeLock().unlock();
             }
-            
+
             long duration = System.currentTimeMillis() - startTime;
-            logger.info("MBean discovery completed: {} MBeans discovered in {}ms", 
+            logger.info("MBean discovery completed: {} MBeans discovered in {}ms",
                        mbeanCache.size(), duration);
-            
+
         } catch (IOException | RuntimeException e) {
             logger.error("Failed to discover MBeans", e);
         }
     }
 
     /**
-     * Loads MBean information and adds it to the cache.
+     * Loads MBean information and adds it to the given target map.
      */
-    private void loadMBeanInfo(MBeanServerConnection connection, ObjectName objectName) {
+    private void loadMBeanInfo(MBeanServerConnection connection, ObjectName objectName,
+                               Map<ObjectName, MBeanInfo> target) {
         try {
             javax.management.MBeanInfo jmxInfo = connection.getMBeanInfo(objectName);
             MBeanInfo mbeanInfo = MBeanInfo.from(objectName, jmxInfo);
-            mbeanCache.put(objectName, mbeanInfo);
+            target.put(objectName, mbeanInfo);
         } catch (InstanceNotFoundException | IntrospectionException | ReflectionException | IOException | RuntimeException e) {
             logger.debug("Failed to get MBean info for {}: {}", objectName, e.getMessage());
         }
