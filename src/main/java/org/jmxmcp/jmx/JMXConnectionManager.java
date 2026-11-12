@@ -6,7 +6,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.management.MBeanServerConnection;
 import javax.management.remote.JMXConnector;
-import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
 import java.io.IOException;
 import java.util.HashMap;
@@ -88,7 +87,7 @@ public class JMXConnectionManager {
             JMXServiceURL serviceURL = new JMXServiceURL(url);
             Map<String, Object> environment = createConnectionEnvironment(username, password, properties);
 
-            JMXConnector connector = JMXConnectorFactory.connect(serviceURL, environment);
+            JMXConnector connector = JmxConnectors.connect(serviceURL, environment, this.properties.connection().timeout());
             MBeanServerConnection connection = connector.getMBeanServerConnection();
             int mbeanCount = connection.getMBeanCount();
 
