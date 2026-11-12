@@ -10,7 +10,7 @@ spring:
         enabled: true
         name: "Remote JMX MCP Server"
         version: "1.0.0"
-        type: SYNC
+        type: ASYNC  # Handle MCP requests concurrently so one slow call doesn't block others
         instructions: "This server provides JMX monitoring and management capabilities for remote Java applications through MCP. Connect to remote JMX servers to monitor and manage distributed Java applications."
         sse-message-endpoint: /mcp/messages
         capabilities:
