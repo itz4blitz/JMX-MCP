@@ -185,31 +185,21 @@ public class JMXConnectionManager {
     }
 
     /**
-     * Checks if there is an active JMX connection.
+     * Checks if there is an active, connected JMX connection.
+     *
+     * This is a cheap status check against the registry and deliberately does
+     * not perform a remote round trip (a getMBeanCount() probe on every call
+     * added latency to each scheduled refresh and status check). Actual
+     * connectivity is verified by the JMX calls themselves: if the connection
+     * died, discovery/attribute calls fail with IOException and are handled
+     * by the callers.
      */
     public boolean isConnected() {
         Optional<JmxConnectionInfo> activeConnection = connectionRegistry.getActiveConnection();
         if (activeConnection.isEmpty()) {
             return false;
         }
-
-        JmxConnectionInfo connectionInfo = activeConnection.get();
-        if (!connectionInfo.isConnected()) {
-            return false;
-        }
-
-        try {
-            // Test the connection by getting MBean count
-            connectionInfo.connection().getMBeanCount();
-            return true;
-        } catch (IOException | RuntimeException e) {
-            logger.warn("Active JMX connection test failed", e);
-            // Update connection status to failed
-            JmxConnectionInfo failedConnection = connectionInfo.withStatus(
-                JmxConnectionInfo.ConnectionStatus.FAILED, e.getMessage());
-            connectionRegistry.updateConnection(failedConnection);
-            return false;
-        }
+        return activeConnection.get().isConnected();
     }
 
     /**
