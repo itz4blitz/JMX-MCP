@@ -63,9 +63,10 @@ public class JmxMcpConfiguration {
      * Creates the JMX discovery service bean.
      */
     @Bean
-    public JmxDiscoveryService jmxDiscoveryService(JmxConnectionRegistry connectionRegistry) {
+    public JmxDiscoveryService jmxDiscoveryService(JmxConnectionRegistry connectionRegistry,
+                                                   JmxConnectionProperties properties) {
         logger.info("Creating JMX discovery service");
-        return new JmxDiscoveryService(connectionRegistry);
+        return new JmxDiscoveryService(connectionRegistry, properties);
     }
 
     // MBeanDiscoveryService is automatically created via @Service annotation

@@ -1,18 +1,20 @@
 package org.jmxmcp.service;
 
+import org.jmxmcp.config.JmxConnectionProperties;
 import org.jmxmcp.jmx.JmxConnectionInfo;
 import org.jmxmcp.jmx.JmxConnectionRegistry;
+import org.jmxmcp.jmx.JmxConnectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import javax.management.MBeanServerConnection;
 import javax.management.remote.JMXConnector;
-import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
 import java.lang.management.ManagementFactory;
 import java.lang.management.RuntimeMXBean;
 import java.net.ConnectException;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -48,11 +50,19 @@ public class JmxDiscoveryService {
         9990, 9991, 9992        // JBoss/WildFly management ports
     };
     
+    /** Upper bound for a single port-scan connection attempt. */
+    private static final Duration MAX_PORT_SCAN_TIMEOUT = Duration.ofSeconds(3);
+
+    /** Upper bound for attaching to a single local process. */
+    private static final long PROCESS_ATTACH_TIMEOUT_SECONDS = 10;
+
     private final JmxConnectionRegistry connectionRegistry;
+    private final JmxConnectionProperties properties;
     private final ExecutorService executorService;
 
-    public JmxDiscoveryService(JmxConnectionRegistry connectionRegistry) {
+    public JmxDiscoveryService(JmxConnectionRegistry connectionRegistry, JmxConnectionProperties properties) {
         this.connectionRegistry = connectionRegistry;
+        this.properties = properties;
         this.executorService = Executors.newFixedThreadPool(5);
     }
     
@@ -118,6 +128,8 @@ public class JmxDiscoveryService {
                 Thread.currentThread().interrupt();
                 logger.debug("Port scan interrupted: {}", e.getMessage());
             } catch (ExecutionException | TimeoutException e) {
+                // Free the pool thread instead of leaving the task running
+                future.cancel(true);
                 logger.debug("Port scan future failed: {}", e.getMessage());
             }
         }
@@ -139,12 +151,15 @@ public class JmxDiscoveryService {
             
             JMXServiceURL serviceURL = new JMXServiceURL(url);
             Map<String, Object> environment = new HashMap<>();
-            
-            // Set short timeout for discovery
-            environment.put("jmx.remote.x.request.waiting.timeout", "3000");
-            environment.put("jmx.remote.x.notification.fetch.timeout", "3000");
-            
-            try (JMXConnector connector = JMXConnectorFactory.connect(serviceURL, environment)) {
+
+            // Bound the connection attempt: never longer than the configured
+            // timeout, and at most 3s per port during a scan.
+            Duration configured = properties.connection().timeout();
+            Duration scanTimeout = configured != null && configured.compareTo(MAX_PORT_SCAN_TIMEOUT) < 0
+                    ? configured
+                    : MAX_PORT_SCAN_TIMEOUT;
+
+            try (JMXConnector connector = JmxConnectors.connect(serviceURL, environment, scanTimeout)) {
                 MBeanServerConnection connection = connector.getMBeanServerConnection();
 
                 // Get basic information about the connection
@@ -217,7 +232,7 @@ public class JmxDiscoveryService {
      */
     private List<JmxConnectionInfo> discoverLocalProcesses() {
         logger.info("Discovering local Java processes with JMX enabled...");
-        List<JmxConnectionInfo> discovered = new ArrayList<>();
+        List<CompletableFuture<Optional<JmxConnectionInfo>>> futures = new ArrayList<>();
 
         try {
             String currentPid = getCurrentProcessId();
@@ -233,28 +248,32 @@ public class JmxDiscoveryService {
                     continue;
                 }
 
-                processVirtualMachine(vmd, discovered);
+                // Attach to processes in parallel instead of sequentially
+                futures.add(CompletableFuture.supplyAsync(() -> attachToProcess(vmd), executorService));
             }
 
         } catch (Exception e) {
             logger.warn("Local process discovery failed: {}", e.getMessage());
         }
 
+        // Collect results, bounding each attach so one hanging process cannot
+        // stall the whole discovery
+        List<JmxConnectionInfo> discovered = new ArrayList<>();
+        for (CompletableFuture<Optional<JmxConnectionInfo>> future : futures) {
+            try {
+                future.get(PROCESS_ATTACH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                    .ifPresent(discovered::add);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (ExecutionException | TimeoutException e) {
+                future.cancel(true);
+                logger.debug("Process attach failed or timed out: {}", e.getMessage());
+            }
+        }
+
         logger.info("Local process discovery completed. Found {} JMX-enabled processes", discovered.size());
         return discovered;
-    }
-
-    /**
-     * Processes a single virtual machine for JMX discovery
-     */
-    private void processVirtualMachine(VirtualMachineDescriptor vmd, List<JmxConnectionInfo> discovered) {
-        try {
-            Optional<JmxConnectionInfo> connectionInfo = attachToProcess(vmd);
-            connectionInfo.ifPresent(discovered::add);
-        } catch (Exception e) {
-            logger.debug("Failed to attach to process {} ({}): {}",
-                vmd.id(), vmd.displayName(), e.getMessage());
-        }
     }
 
     /**
@@ -347,7 +366,7 @@ public class JmxDiscoveryService {
     private Optional<Integer> testAndCountMBeans(String jmxUrl) {
         try {
             JMXServiceURL serviceURL = new JMXServiceURL(jmxUrl);
-            try (JMXConnector connector = JMXConnectorFactory.connect(serviceURL, null)) {
+            try (JMXConnector connector = JmxConnectors.connect(serviceURL, null, properties.connection().timeout())) {
                 MBeanServerConnection connection = connector.getMBeanServerConnection();
                 int mbeanCount = connection.getMBeanCount();
                 logger.debug("Successfully connected to {} with {} MBeans", jmxUrl, mbeanCount);

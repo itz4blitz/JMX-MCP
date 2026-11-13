@@ -20,6 +20,7 @@ import org.mockito.quality.Strictness;
 import javax.management.MBeanServerConnection;
 import javax.management.ObjectName;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -129,6 +130,7 @@ class JmxResourceServiceTest {
             "Memory management", List.of(attribute), List.of(), List.of());
         
         when(discoveryService.getAllMBeans()).thenReturn(List.of(mbeanInfo));
+        when(discoveryService.getMBean(objectName)).thenReturn(Optional.of(mbeanInfo));
         when(securityValidator.validateObjectName(objectName))
             .thenReturn(JmxSecurityValidator.ValidationResult.valid());
         when(mbeanConnection.getAttribute(objectName, "HeapMemoryUsage"))

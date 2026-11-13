@@ -17,7 +17,7 @@ spring:
         stdio: true  # Enable STDIO transport for Claude Desktop
         name: "JMX MCP Server"
         version: "1.0.0"
-        type: SYNC
+        type: ASYNC  # Handle MCP requests concurrently so one slow call doesn't block others
         instructions: "This server provides JMX monitoring and management capabilities through MCP. It exposes JMX operations as tools and JMX attributes as resources, allowing AI models to monitor and manage Java applications."
 
         capabilities:

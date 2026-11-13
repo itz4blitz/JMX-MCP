@@ -10,7 +10,7 @@ spring:
         enabled: true
         name: "Docker JMX MCP Server"
         version: "1.0.0"
-        type: SYNC
+        type: ASYNC  # Handle MCP requests concurrently so one slow call doesn't block others
         instructions: "JMX MCP Server running in Docker, capable of monitoring containerized Java applications"
         sse-message-endpoint: /mcp/messages
         capabilities:

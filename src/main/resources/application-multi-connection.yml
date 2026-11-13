@@ -13,7 +13,7 @@ spring:
         stdio: true  # Enable STDIO transport for Claude Desktop
         name: "JMX MCP Server (Multi-Connection)"
         version: "1.0.0"
-        type: SYNC
+        type: ASYNC  # Handle MCP requests concurrently so one slow call doesn't block others
         instructions: "This server provides JMX monitoring and management capabilities through MCP with support for multiple JMX connections. It can auto-discover and connect to multiple JMX-enabled applications."
 
         capabilities:

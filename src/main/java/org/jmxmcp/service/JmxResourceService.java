@@ -63,6 +63,9 @@ public class JmxResourceService {
     private final ReadWriteLock resourceCacheLock = new ReentrantReadWriteLock();
     private volatile boolean resourcesInitialized = false;
 
+    // Index from sanitized ObjectName (as used in resource URIs) to MBean, rebuilt on discovery
+    private final Map<String, MBeanInfo> mbeansBySanitizedName = new ConcurrentHashMap<>();
+
     // Cache for attribute values with TTL
     private final Map<String, CachedAttributeValue> attributeValueCache = new ConcurrentHashMap<>();
     private final ReadWriteLock attributeCacheLock = new ReentrantReadWriteLock();
@@ -230,11 +233,13 @@ public class JmxResourceService {
 
         resourceCacheLock.writeLock().lock();
         try {
+            Collection<MBeanInfo> mbeans = discoveryService.getAllMBeans();
             Set<String> oldResourceUris = new HashSet<>(resourceCache.keySet());
-            Map<String, McpSchema.Resource> newResourceMap = buildNewResourceMap();
+            Map<String, McpSchema.Resource> newResourceMap = buildNewResourceMap(mbeans);
 
             ResourceChanges changes = detectResourceChanges(oldResourceUris, newResourceMap);
             updateResourceCache(newResourceMap);
+            updateSanitizedNameIndex(mbeans);
 
             logger.info("Discovered {} JMX attribute resources from {} MBeans",
                 newResourceMap.size(), discoveryService.getAllMBeans().size());
@@ -247,11 +252,22 @@ public class JmxResourceService {
     }
 
     /**
+     * Rebuilds the sanitized-ObjectName index used for O(1) resource URI parsing.
+     */
+    private void updateSanitizedNameIndex(Collection<MBeanInfo> mbeans) {
+        Map<String, MBeanInfo> newIndex = new HashMap<>();
+        for (MBeanInfo mbean : mbeans) {
+            newIndex.put(sanitizeObjectName(mbean.objectName()), mbean);
+        }
+        mbeansBySanitizedName.clear();
+        mbeansBySanitizedName.putAll(newIndex);
+    }
+
+    /**
      * Builds a new resource map from discovered MBeans.
      */
-    private Map<String, McpSchema.Resource> buildNewResourceMap() {
+    private Map<String, McpSchema.Resource> buildNewResourceMap(Collection<MBeanInfo> mbeans) {
         Map<String, McpSchema.Resource> newResourceMap = new HashMap<>();
-        Collection<MBeanInfo> mbeans = discoveryService.getAllMBeans();
 
         for (MBeanInfo mbean : mbeans) {
             for (MBeanInfo.MBeanAttributeInfo attribute : mbean.attributes()) {
@@ -401,23 +417,29 @@ public class JmxResourceService {
             return null;
         }
 
-        // Find the actual ObjectName by searching through discovered MBeans
-        // This is more reliable than trying to reverse the sanitization
-        Collection<MBeanInfo> mbeans = discoveryService.getAllMBeans();
-        for (MBeanInfo mbean : mbeans) {
-            String sanitized = sanitizeObjectName(mbean.objectName());
-            if (sanitized.equals(sanitizedObjectName)) {
-                // Verify that the attribute exists on this MBean
-                if (mbean.getAttribute(attributeName) != null) {
-                    return new ResourceUriInfo(mbean.objectName(), attributeName);
-                } else {
-                    logger.debug("Attribute '{}' not found on MBean: {}", attributeName, mbean.objectName());
-                    return null;
+        // Look up the MBean via the sanitized-name index (O(1)); fall back to a
+        // linear scan if the index has not been built yet.
+        MBeanInfo mbean = mbeansBySanitizedName.get(sanitizedObjectName);
+        if (mbean == null) {
+            for (MBeanInfo candidate : discoveryService.getAllMBeans()) {
+                if (sanitizeObjectName(candidate.objectName()).equals(sanitizedObjectName)) {
+                    mbean = candidate;
+                    break;
                 }
             }
         }
 
-        logger.debug("Could not find MBean for sanitized ObjectName: {}", sanitizedObjectName);
+        if (mbean == null) {
+            logger.debug("Could not find MBean for sanitized ObjectName: {}", sanitizedObjectName);
+            return null;
+        }
+
+        // Verify that the attribute exists on this MBean
+        if (mbean.getAttribute(attributeName) != null) {
+            return new ResourceUriInfo(mbean.objectName(), attributeName);
+        }
+
+        logger.debug("Attribute '{}' not found on MBean: {}", attributeName, mbean.objectName());
         return null;
     }
 
@@ -597,27 +619,25 @@ public class JmxResourceService {
             // Log but don't block - let the application decide
         }
 
-        // Validate that the attribute exists and is readable
+        // Validate that the attribute exists and is readable (direct cache lookup, O(1))
         try {
-            Collection<MBeanInfo> mbeans = discoveryService.getAllMBeans();
-            for (MBeanInfo mbean : mbeans) {
-                if (mbean.objectName().equals(objectName)) {
-                    MBeanInfo.MBeanAttributeInfo attribute = mbean.getAttribute(attributeName);
-                    if (attribute == null) {
-                        return JmxSecurityValidator.ValidationResult.invalid(
-                            "Attribute '" + attributeName + "' not found on MBean: " + objectName);
-                    }
-
-                    if (!attribute.readable()) {
-                        return JmxSecurityValidator.ValidationResult.invalid(
-                            "Attribute '" + attributeName + "' is not readable on MBean: " + objectName);
-                    }
-
-                    return JmxSecurityValidator.ValidationResult.valid();
-                }
+            Optional<MBeanInfo> mbeanOpt = discoveryService.getMBean(objectName);
+            if (mbeanOpt.isEmpty()) {
+                return JmxSecurityValidator.ValidationResult.invalid("MBean not found: " + objectName);
             }
 
-            return JmxSecurityValidator.ValidationResult.invalid("MBean not found: " + objectName);
+            MBeanInfo.MBeanAttributeInfo attribute = mbeanOpt.get().getAttribute(attributeName);
+            if (attribute == null) {
+                return JmxSecurityValidator.ValidationResult.invalid(
+                    "Attribute '" + attributeName + "' not found on MBean: " + objectName);
+            }
+
+            if (!attribute.readable()) {
+                return JmxSecurityValidator.ValidationResult.invalid(
+                    "Attribute '" + attributeName + "' is not readable on MBean: " + objectName);
+            }
+
+            return JmxSecurityValidator.ValidationResult.valid();
 
         } catch (Exception e) {
             logger.error("Error validating attribute access for {}.{}", objectName, attributeName, e);
